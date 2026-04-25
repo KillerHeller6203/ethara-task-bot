@@ -446,8 +446,15 @@ def run_task(driver: webdriver.Chrome, task: dict):
 
     # ── 3. Click Start Task ───────────────────────────────────────────────────
     log.info("  [3] Clicking Start Task...")
+    driver.execute_script("""
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        document.body.click();
+    """)
+    time.sleep(1)
     start_btn = wait_click(driver, By.CSS_SELECTOR, "[data-testid='start-task-btn']")
-    start_btn.click()
+    driver.execute_script("arguments[0].scrollIntoView(true);", start_btn)
+    time.sleep(0.3)
+    driver.execute_script("arguments[0].click();", start_btn)
     task_start_time = time.time()
     log.info(f"      Started at {datetime.now().strftime('%H:%M:%S')}")
     time.sleep(2)
