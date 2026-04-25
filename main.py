@@ -326,7 +326,13 @@ def ethara_login(driver: webdriver.Chrome):
     log.info("  [1/4] Clicking Tasker role...")
     tasker_btn = wait_click(driver, By.CSS_SELECTOR, "[data-testid='role-tasker']")
     tasker_btn.click()
-    time.sleep(1)
+    time.sleep(2)
+
+    # Check if already logged in after clicking Tasker (auto-login)
+    if "tasker" in driver.current_url and "login" not in driver.current_url:
+        log.info("  Auto-logged in after Tasker click!")
+        save_session(driver)
+        return
 
     # 2. Fill email
     log.info("  [2/4] Entering email...")
@@ -392,8 +398,14 @@ def run_task(driver: webdriver.Chrome, task: dict):
     log.info(f"  Justif   : {'SKIP checkbox' if justif_skip else justif[:60]}")
 
     # Navigate to dashboard
+    # Navigate to dashboard
     driver.get(CONFIG["ethara_tasker_url"])
-    time.sleep(2)
+    time.sleep(3)
+    # Wait until task input is actually visible before proceeding
+    WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='task-name-input']"))
+    )
+    log.info("Dashboard loaded")
 
     # ── 1. Enter Task ID ──────────────────────────────────────────────────────
     log.info("  [1] Entering Task ID...")
@@ -413,32 +425,38 @@ def run_task(driver: webdriver.Chrome, task: dict):
             time.sleep(0.3)
 
             trigger = wait_click(driver, By.CSS_SELECTOR,
-                "[data-testid='task-project-select-trigger']")
+                                 "[data-testid='task-project-select-trigger']")
             trigger.click()
             time.sleep(0.8)
 
             search = wait_visible(driver, By.CSS_SELECTOR,
-                "[data-testid='my-projects-search']")
+                                  "[data-testid='my-projects-search']")
             react_type(driver, search, project)
             time.sleep(0.8)
 
             clicked = driver.execute_script("""
-                var project = arguments[0];
-                var btns = document.querySelectorAll(
-                    "[data-testid^='project-toggle-']"
-                );
-                for(var btn of btns) {
-                    if(btn.offsetParent !== null &&
-                       btn.innerText.trim().startsWith(project)) {
-                        btn.click();
-                        return btn.innerText.trim().slice(0, 60);
+                    var project = arguments[0];
+                    var btns = document.querySelectorAll(
+                        "[data-testid^='project-toggle-']"
+                    );
+                    for(var btn of btns) {
+                        if(btn.offsetParent !== null &&
+                           btn.innerText.trim().startsWith(project)) {
+                            btn.click();
+                            return btn.innerText.trim().slice(0, 60);
+                        }
                     }
-                }
-                return null;
-            """, project)
+                    return null;
+                """, project)
 
             if clicked:
                 log.info(f"      Project selected: {clicked}")
+                time.sleep(0.5)
+                driver.execute_script("""
+                        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+                        document.body.click();
+                    """)
+                time.sleep(0.5)
             else:
                 log.warning(f"      Project '{project}' not found in dropdown")
         except Exception as e:
